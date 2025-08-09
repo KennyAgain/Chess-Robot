@@ -34,8 +34,20 @@ def Readfen(fen):
 
     return pieces
 
+def MoveGenRook(BoardState,StartSquare):
+    RookMoves = []
+    
+    return RookMoves
 
-#movegen
+
+def ValidMoves(BoardState, StartSquare):
+    valid_moves = []
+
+    print(BoardState[StartSquare[0]][StartSquare[1]])
+    if BoardState[StartSquare[0]][StartSquare[1]] == 5 or BoardState[StartSquare[0]][StartSquare[1]] == 11:
+        valid_moves = MoveGenRook(BoardState,StartSquare)
+
+    return valid_moves
 
 
 if __name__ == '__main__':

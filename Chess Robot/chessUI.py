@@ -1,6 +1,8 @@
 import pygame
 import chessAI
 import chessCore
+import chessRobotCom
+import copy
 
 import random
 
@@ -20,7 +22,7 @@ pygame.display.set_caption("Chess Board")
 clock = pygame.time.Clock()
 
 
-piece_Image = pygame.image.load("pieces.png").convert_alpha()
+piece_Image = pygame.image.load("Chess Robot\pieces.png").convert_alpha()
 piece_Image = pygame.transform.scale(piece_Image,(H/8*6,H/8*2))
 
 p_w, p_h = piece_Image.get_size()
@@ -70,9 +72,11 @@ chess_active = True
 PieceMasks = CreatePieceMasks()
 
 piecepickedup = -1
+start_square = (-1,-1)
 
 #set initial starting postion
-BoardPieces = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+BoardState = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+DisplayBoardState = copy.deepcopy(BoardState)
 
 while chess_active:
 
@@ -81,27 +85,37 @@ while chess_active:
 
         if event.type == pygame.QUIT:
             chess_active = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if piecepickedup == -1:
-                
-                clicked_row, clicked_column = CheckFieldClicked(mouse_pos)
 
-                if BoardPieces[clicked_row][clicked_column] > 0:
-                    piecepickedup = BoardPieces[clicked_row][clicked_column]
-                    BoardPieces[clicked_row][clicked_column] = 0
+        elif event.type == pygame.MOUSEBUTTONDOWN and piecepickedup == -1:
+            clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            if piecepickedup > -1:
-                clicked_row, clicked_column = CheckFieldClicked(mouse_pos)
-                BoardPieces[clicked_row][clicked_column] = piecepickedup
-                piecepickedup = -1
-                print(mouse_pos)
- 
+            piece = BoardState[clicked_row][clicked_col]
+            if piece > 0:
+                piecepickedup = piece
+                start_square = (clicked_row, clicked_col)
+                # Remove from display state only
+                DisplayBoardState[clicked_row][clicked_col] = 0
+
+        elif event.type == pygame.MOUSEBUTTONUP and piecepickedup > -1:
+            clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
+            valid_moves = chessCore.ValidMoves(BoardState, start_square)
+
+            if (clicked_row, clicked_col) in valid_moves:
+                BoardState[clicked_row][clicked_col] = piecepickedup
+                BoardState[start_square[0]][start_square[1]] = 0
+                DisplayBoardState = copy.deepcopy(BoardState)  # fresh copy for display
+            else:
+                # Invalid move: restore piece in display state for smooth visual
+                DisplayBoardState[start_square[0]][start_square[1]] = piecepickedup
+
+            piecepickedup = -1
+            start_square = (-1, -1)
+
 
     screen.fill((125,125,125))
 
     DrawBoard(screen)
-    DrawPieces(screen,BoardPieces,mouse_pos)
+    DrawPieces(screen,DisplayBoardState,mouse_pos)
 
     pygame.display.flip()
 
