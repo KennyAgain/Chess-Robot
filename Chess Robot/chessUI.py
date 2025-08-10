@@ -58,8 +58,14 @@ def DrawPieces(screen,pieces,mouse_pos):
             if pieces[row][column] > 0:
                 screen.blit(piece_Image,(row*stepPerField,column*stepPerField),PieceMasks[pieces[row][column]-1])
     
-    if piecepickedup > -1:
+    if piecepickedup > -1: #draw picked up piece
         screen.blit(piece_Image,(mouse_pos[0] - stepPerField/2,mouse_pos[1] - stepPerField/2),PieceMasks[piecepickedup - 1])
+    
+def DrawValidMoves(screen,valid_moves):
+    stepPerField = H / 8
+    for move in valid_moves:
+        pygame.draw.circle(screen,(64, 166, 226),(move[0] * stepPerField + stepPerField/2, move[1] * stepPerField + stepPerField / 2),stepPerField / 4)
+
 
 def CheckFieldClicked(mouse_pos):
     stepPerField = H / 8
@@ -67,16 +73,20 @@ def CheckFieldClicked(mouse_pos):
         for column in range(8):
             if pygame.Rect(row*stepPerField,column*stepPerField,stepPerField,stepPerField).collidepoint(mouse_pos):
                 return row,column
+    return -1,-1
 
 chess_active = True
 PieceMasks = CreatePieceMasks()
 
 piecepickedup = -1
 start_square = (-1,-1)
+valid_moves = []
 
 #set initial starting postion
-BoardState = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+BoardState, ToMove = chessCore.Readfen("2b3n1/pp1pp3/N1b1Prkp/2P3p1/1PBp1QR1/P3n3/1rq2PPP/R3KBN1 w Q - 0 1")
 DisplayBoardState = copy.deepcopy(BoardState)
+
+print(ToMove)
 
 while chess_active:
 
@@ -90,23 +100,28 @@ while chess_active:
             clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
 
             piece = BoardState[clicked_row][clicked_col]
-            if piece > 0:
+            if piece > 0 and chessCore.GetPieceColor(piece) == ToMove:
                 piecepickedup = piece
                 start_square = (clicked_row, clicked_col)
                 # Remove from display state only
                 DisplayBoardState[clicked_row][clicked_col] = 0
+                valid_moves = chessCore.ValidMoves(BoardState, start_square,piece)
 
         elif event.type == pygame.MOUSEBUTTONUP and piecepickedup > -1:
             clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
-            valid_moves = chessCore.ValidMoves(BoardState, start_square)
+            
 
             if (clicked_row, clicked_col) in valid_moves:
+                #Logic if a valid move is performed
                 BoardState[clicked_row][clicked_col] = piecepickedup
                 BoardState[start_square[0]][start_square[1]] = 0
                 DisplayBoardState = copy.deepcopy(BoardState)  # fresh copy for display
+                valid_moves = []
+                ToMove = "b" if ToMove == "w" else "w"
             else:
                 # Invalid move: restore piece in display state for smooth visual
                 DisplayBoardState[start_square[0]][start_square[1]] = piecepickedup
+                valid_moves = []
 
             piecepickedup = -1
             start_square = (-1, -1)
@@ -115,7 +130,9 @@ while chess_active:
     screen.fill((125,125,125))
 
     DrawBoard(screen)
+    DrawValidMoves(screen,valid_moves)
     DrawPieces(screen,DisplayBoardState,mouse_pos)
+    
 
     pygame.display.flip()
 
