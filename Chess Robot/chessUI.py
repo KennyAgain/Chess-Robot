@@ -83,7 +83,7 @@ start_square = (-1,-1)
 valid_moves = []
 
 #set initial starting postion
-BoardState, ToMove = chessCore.Readfen("2b3n1/pp1pp3/N1b1Prkp/2P3p1/1PBp1QR1/P3n3/1rq2PPP/R3KBN1 w Q - 0 1")
+BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 DisplayBoardState = copy.deepcopy(BoardState)
 
 print(ToMove)
@@ -105,11 +105,10 @@ while chess_active:
                 start_square = (clicked_row, clicked_col)
                 # Remove from display state only
                 DisplayBoardState[clicked_row][clicked_col] = 0
-                valid_moves = chessCore.ValidMoves(BoardState, start_square,piece)
+                valid_moves = chessCore.ValidMoves(BoardState, start_square,piece,ToMove)
 
         elif event.type == pygame.MOUSEBUTTONUP and piecepickedup > -1:
             clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
-            
 
             if (clicked_row, clicked_col) in valid_moves:
                 #Logic if a valid move is performed
@@ -117,6 +116,10 @@ while chess_active:
                 BoardState[start_square[0]][start_square[1]] = 0
                 DisplayBoardState = copy.deepcopy(BoardState)  # fresh copy for display
                 valid_moves = []
+
+                if not chessCore.IsMate(BoardState) == "": print(f"Mate: {chessCore.IsMate(BoardState)}")
+                if not chessCore.IsStaleMate(BoardState) == "": print(f"Stale Mate: {chessCore.IsStaleMate(BoardState)}")
+
                 ToMove = "b" if ToMove == "w" else "w"
             else:
                 # Invalid move: restore piece in display state for smooth visual
