@@ -39,6 +39,58 @@ def Readfen(fen):
 
     return pieces, ToMove
 
+def CreateFen(BoardState, ToMove, EnPassant="-", Halfmove="0", Fullmove="1"):
+    """
+    Creates a FEN string from a numeric board representation that is rotated 90°.
+    """
+
+    fen_rows = []
+    # Loop from rank 8 to rank 1
+    for rank in range(8):
+        empty_count = 0
+        fen_row = ""
+        # Now rank index comes from *columns* in your board
+        for file in range(8):
+            # Transpose + flip vertical to get correct FEN orientation
+            piece = BoardState[file][rank]
+            if piece == 0:
+                empty_count += 1
+            else:
+                if empty_count > 0:
+                    fen_row += str(empty_count)
+                    empty_count = 0
+                piece_letter = GetPieceType(piece)
+                if GetPieceColor(piece) == "b":
+                    piece_letter = piece_letter.lower()
+                fen_row += piece_letter
+        if empty_count > 0:
+            fen_row += str(empty_count)
+        fen_rows.append(fen_row)
+
+    fen_board = "/".join(fen_rows)
+
+    # Detect castling rights from your rotated board
+    castling = ""
+    # White kingside
+    if BoardState[7][4] == 1 and BoardState[7][7] == 5:
+        castling += "K"
+    # White queenside
+    if BoardState[7][4] == 1 and BoardState[7][0] == 5:
+        castling += "Q"
+    # Black kingside
+    if BoardState[0][4] == 7 and BoardState[0][7] == 11:
+        castling += "k"
+    # Black queenside
+    if BoardState[0][4] == 7 and BoardState[0][0] == 11:
+        castling += "q"
+
+    if castling == "":
+        castling = "-"
+
+    return f"{fen_board} {ToMove} {castling} {EnPassant} {Halfmove} {Fullmove}"
+
+
+
 def MoveGenRook(BoardState, StartSquare, pieceColor, piece_type):
     RookMoves = []
     x, y = StartSquare
@@ -206,7 +258,7 @@ def IsMate(BoardState):
         for x,row in enumerate(BoardState):
             for y,piece in enumerate(row):
                 if GetPieceColor(piece) == color and piece > 0:
-                    TotalValidMoves += len(ValidMoves(BoardState,(x,y),piece,color))
+                    TotalValidMoves += len(ValidPieceMoves(BoardState,(x,y),piece,color))
         if TotalValidMoves == 0 and InCheck(BoardState,ColorCHRtoNUM(color)):
             return color
     return ""
@@ -219,7 +271,7 @@ def IsStaleMate(BoardState):
         for x,row in enumerate(BoardState):
             for y,piece in enumerate(row):
                 if GetPieceColor(piece) == color and piece > 0:
-                    TotalValidMoves += len(ValidMoves(BoardState,(x,y),piece,color))
+                    TotalValidMoves += len(ValidPieceMoves(BoardState,(x,y),piece,color))
         if TotalValidMoves == 0 and not InCheck(BoardState,ColorCHRtoNUM(color)):
             return color
     return ""
@@ -246,7 +298,36 @@ def GetAttackedSquares(BoardState, Color):
 
     return AttackedSquares
 
-def ValidMoves(BoardState, StartSquare, piece_type, ToMove):
+def MakeMove(BoardState,StartSquare,EndSquare):
+    Capture = BoardState[StartSquare[0]][StartSquare[1]] == 0
+    
+    if (EndSquare[1] == 0 or EndSquare[1] == 7 )and GetPieceType(BoardState[StartSquare[0]][StartSquare[1]]) == "P":
+        if GetPieceColor(BoardState[StartSquare[0]][StartSquare[1]]) == "w":
+            BoardState[EndSquare[0]][EndSquare[1]] = 2
+        else:
+            BoardState[EndSquare[0]][EndSquare[1]] = 8
+    else:
+        BoardState[EndSquare[0]][EndSquare[1]] = BoardState[StartSquare[0]][StartSquare[1]]
+
+    BoardState[StartSquare[0]][StartSquare[1]] = 0
+    
+    
+    return BoardState, Capture
+
+def ValidMoves(BoardState,ToMove):
+    #returns a list of all valid moves for the given color. example : [((0,0),(1,1)),]
+    ValidMoves = []
+    for x,row in enumerate(BoardState):
+        for y,piece in enumerate(row):
+            if GetPieceColor(piece) == ToMove and piece > 0:
+                PieceMoves = ValidPieceMoves(BoardState,(x,y),piece,ToMove)
+                if len(PieceMoves) > 0:
+                    for move in PieceMoves:
+                        ValidMoves.append(((x,y),(move)))
+    return ValidMoves
+
+
+def ValidPieceMoves(BoardState, StartSquare, piece_type, ToMove):
     pieceColor = ColorCHRtoNUM(GetPieceColor(piece_type)) # 0 or 1
 
     move_generators = {
