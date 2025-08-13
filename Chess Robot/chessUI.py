@@ -78,9 +78,13 @@ def CheckFieldClicked(mouse_pos):
 
 def CheckGameEnd(BoardState):
     global chess_active
+    global ToMove
     if not chessCore.IsMate(BoardState) == "": print(f"Mate: {chessCore.IsMate(BoardState)}")
     if not chessCore.IsStaleMate(BoardState) == "": print(f"Stale Mate: {chessCore.IsStaleMate(BoardState)}")    
-    chess_active = False
+    # chess_active = False
+    BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    return BoardState
+
 def HandelMove(start,end,ToMove):
     global FullMove
     global HalfMove
@@ -91,7 +95,7 @@ def HandelMove(start,end,ToMove):
     #Logic if a valid move is performed
     BoardState, Capture = chessCore.MakeMove(BoardState,start,end)
     if chessCore.GetPieceType(BoardState[end[0]][end[1]]) == "P": HalfMove = 0
-    if Capture: HalfMove = 0
+    if Capture > 0: HalfMove = 0
     DisplayBoardState = copy.deepcopy(BoardState)  # fresh copy for display
     valid_moves = []
 
@@ -120,12 +124,12 @@ HalfMove = 0
 
 print(ToMove)
 
-WAIT_TIME = 1  # 1 second in milliseconds
+WAIT_TIME = 0 # 1 second in milliseconds
 last_move_time = 0
 move_in_progress = False
 
 NOAI = False
-PLAYER_AGAINST_AI = False
+PLAYER_AGAINST_AI = True
 
 while chess_active:
     mouse_pos = pygame.mouse.get_pos()
@@ -162,9 +166,9 @@ while chess_active:
     else:
         if ToMove == FirstMove:
             valid_moves = chessCore.ValidMoves(BoardState, ToMove)
-            start_square, end_square,checkend = chessAI.Move(BoardState, ToMove, valid_moves)
-            if checkend: CheckGameEnd(BoardState)
+            if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)
             else:
+                start_square, end_square = chessAI.Simple_AI.Move(BoardState, ToMove, valid_moves)
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
                 last_move_time = pygame.time.get_ticks()
                 move_in_progress = True
@@ -172,15 +176,16 @@ while chess_active:
         elif ToMove != FirstMove and not PLAYER_AGAINST_AI:
             valid_moves = chessCore.ValidMoves(BoardState, ToMove)
 
-            start_square, end_square,checkend = chessAI.Move(BoardState, ToMove, valid_moves)
-            if checkend: CheckGameEnd(BoardState)
+            if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)
             else:
+                start_square, end_square = chessAI.Random_Ai.Move(BoardState, ToMove, valid_moves)
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
                 last_move_time = pygame.time.get_ticks()
     #             move_in_progress = True
     if HalfMove > 50:
         print("50 Half Moves DRAW")
-        chess_active = False
+        # chess_active = False
+        BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
     screen.fill((125, 125, 125))
     DrawBoard(screen)

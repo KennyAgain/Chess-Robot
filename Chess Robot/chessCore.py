@@ -3,6 +3,7 @@ import copy
 
 def __init__():
     global pieceChr
+    global MaterialValue
 
     pieceChr = [
     "K",
@@ -17,6 +18,23 @@ def __init__():
     "n",
     "r",
     "p"]
+
+    MaterialValue = [
+        0,  # 0 - empty
+        0,  # 1 - White King
+        9,  # 2 - White Queen
+        3,  # 3 - White Bishop
+        3,  # 4 - White Knight
+        5,  # 5 - White Rook
+        1,  # 6 - White Pawn
+        0,  # 7 - Black King
+        9,  # 8 - Black Queen
+        3,  # 9 - Black Bishop
+        3,  # 10 - Black Knight
+        5,  # 11 - Black Rook
+        1,  # 12 - Black Pawn
+    ]
+
 
 
 
@@ -254,11 +272,7 @@ def IsMate(BoardState):
     #returns a color if it is mate or "" if not
 
     for color in ["w","b"]:
-        TotalValidMoves = 0
-        for x,row in enumerate(BoardState):
-            for y,piece in enumerate(row):
-                if GetPieceColor(piece) == color and piece > 0:
-                    TotalValidMoves += len(ValidPieceMoves(BoardState,(x,y),piece,color))
+        TotalValidMoves = ValidMoves(BoardState,color)
         if TotalValidMoves == 0 and InCheck(BoardState,ColorCHRtoNUM(color)):
             return color
     return ""
@@ -299,7 +313,7 @@ def GetAttackedSquares(BoardState, Color):
     return AttackedSquares
 
 def MakeMove(BoardState,StartSquare,EndSquare):
-    Capture = BoardState[StartSquare[0]][StartSquare[1]] == 0
+    Capture = BoardState[EndSquare[0]][EndSquare[1]]
     
     if (EndSquare[1] == 0 or EndSquare[1] == 7 )and GetPieceType(BoardState[StartSquare[0]][StartSquare[1]]) == "P":
         if GetPieceColor(BoardState[StartSquare[0]][StartSquare[1]]) == "w":
