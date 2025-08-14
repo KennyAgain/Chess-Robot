@@ -115,7 +115,7 @@ start_square = (-1,-1)
 valid_moves = []
 
 #set initial starting postion
-BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+BoardState, ToMove = chessCore.Readfen("8/5k2/2NP3p/p4q2/1Q6/8/1K1P3n/8 b - - 0 1")
 FirstMove = ToMove
 DisplayBoardState = copy.deepcopy(BoardState)
 
@@ -178,7 +178,7 @@ while chess_active:
 
             if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)
             else:
-                start_square, end_square = chessAI.Random_Ai.Move(BoardState, ToMove, valid_moves)
+                start_square, end_square = chessAI.Simple_AI.Move(BoardState, ToMove, valid_moves)
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
                 last_move_time = pygame.time.get_ticks()
     #             move_in_progress = True

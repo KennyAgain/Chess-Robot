@@ -21,13 +21,13 @@ def __init__():
 
     MaterialValue = [
         0,  # 0 - empty
-        0,  # 1 - White King
+        100,  # 1 - White King
         9,  # 2 - White Queen
         3,  # 3 - White Bishop
         3,  # 4 - White Knight
         5,  # 5 - White Rook
         1,  # 6 - White Pawn
-        0,  # 7 - Black King
+        100,  # 7 - Black King
         9,  # 8 - Black Queen
         3,  # 9 - Black Bishop
         3,  # 10 - Black Knight
