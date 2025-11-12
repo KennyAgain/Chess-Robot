@@ -1,0 +1,14 @@
+import serial
+import serial.tools.list_ports
+
+def find_esp32(baudrate=115200):
+    ports = list(serial.tools.list_ports.comports())
+    for p in ports:
+        if "CH340" in p.description:  # looks for the CH340 USB-Serial chip
+            print(f"Found ESP32 on port {p.device}")
+            return serial.Serial(p.device, baudrate)
+    raise Exception("ESP32 not found")
+
+# Usage
+ser = find_esp32()
+ser.write(b'Hello ESP32\n')

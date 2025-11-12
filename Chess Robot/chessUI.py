@@ -16,14 +16,14 @@ chessCore.__init__()
 LightSquares = (220, 200, 160)  # default lichess light square
 DarkSquares = (160, 120, 80)  # default lichess dark square
 
-W,H = 1000,800
-screen = pygame.display.set_mode((W,H))
+W,H = 800,800
+screen = pygame.display.set_mode((W + 50,H + 50))
 pygame.display.set_caption("Chess Board")
 
 clock = pygame.time.Clock()
 
 
-piece_Image = pygame.image.load("Chess Robot\pieces.png").convert_alpha()
+piece_Image = pygame.image.load("Chess-Robot\Chess Robot\pieces.png").convert_alpha()
 piece_Image = pygame.transform.scale(piece_Image,(H/8*6,H/8*2))
 
 p_w, p_h = piece_Image.get_size()
@@ -41,14 +41,35 @@ def CreatePieceMasks():
             PieceMasks.append(PieceMask)
     return PieceMasks
 
+# def DrawBoard(screen):
+#     stepPerField = H / 8
+#     for row in range(8):
+#         for column in range(8):
+#             if (row + column) % 2 == 0: FieldColor = LightSquares 
+#             else: FieldColor = DarkSquares
+
+#             pygame.draw.rect(screen,FieldColor,(row*stepPerField,column*stepPerField,stepPerField,stepPerField))
+
 def DrawBoard(screen):
     stepPerField = H / 8
+    font = pygame.font.SysFont(None, 24)  # Adjust font size as needed
+
     for row in range(8):
         for column in range(8):
-            if (row + column) % 2 == 0: FieldColor = LightSquares 
-            else: FieldColor = DarkSquares
+            # Determine square color
+            FieldColor = LightSquares if (row + column) % 2 == 0 else DarkSquares
+            # Draw square
+            pygame.draw.rect(screen, FieldColor, (row * stepPerField, column * stepPerField, stepPerField, stepPerField))
 
-            pygame.draw.rect(screen,FieldColor,(row*stepPerField,column*stepPerField,stepPerField,stepPerField))
+    # Draw numbers along axes
+    for i in range(8):
+        # Horizontal (columns) — bottom-right is 0
+        x_text = font.render(str(7 - i), True, (255, 0, 0))
+        screen.blit(x_text, ((7 - i + 0.5) * stepPerField - x_text.get_width()/2, H + 10))
+
+        # Vertical (rows) — bottom-right is 0
+        y_text = font.render(str(7 - i), True, (255, 0, 0))
+        screen.blit(y_text, (H + 10, (7 - i + 0.5) * stepPerField - y_text.get_height()/2))
 
 
 def DrawPieces(screen,pieces,mouse_pos):
@@ -104,6 +125,10 @@ def HandelMove(start,end,ToMove):
     ToMove = "b" if ToMove == "w" else "w"
     print(f"Current Position: {chessCore.CreateFen(BoardState,ToMove,Halfmove=HalfMove,Fullmove=FullMove)}")
 
+    print(f"Move time: {t.time_since_last_call()}")
+
+    
+
     return valid_moves,DisplayBoardState,ToMove
 
 
@@ -115,12 +140,15 @@ start_square = (-1,-1)
 valid_moves = []
 
 #set initial starting postion
-BoardState, ToMove = chessCore.Readfen("8/5k2/2NP3p/p4q2/1Q6/8/1K1P3n/8 b - - 0 1")
+BoardState, ToMove = chessCore.Readfen("rn2k1nr/p1pb1ppp/1P6/2bp2N1/1q6/1K1P4/RPP1P1PP/2BQ1BNR w - - 1 12")
+BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 FirstMove = ToMove
 DisplayBoardState = copy.deepcopy(BoardState)
 
 FullMove = 0
 HalfMove = 0
+
+t = chessCore.Timer()
 
 print(ToMove)
 
@@ -128,12 +156,20 @@ WAIT_TIME = 0 # 1 second in milliseconds
 last_move_time = 0
 move_in_progress = False
 
-NOAI = False
-PLAYER_AGAINST_AI = True
+NOAI = True
+PLAYER_AGAINST_AI = False
+
+ROBOT = True
+ROBOT_AGAINST_AI = False
+ROBOT_AGAINST_PLAYER = False
+
+if ROBOT:
+   chessRobotCom.__init__()
+
 
 while chess_active:
     mouse_pos = pygame.mouse.get_pos()
-
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             chess_active = False
@@ -150,6 +186,7 @@ while chess_active:
         elif event.type == pygame.MOUSEBUTTONUP and piecepickedup > -1:
             clicked_row, clicked_col = CheckFieldClicked(mouse_pos)
             if (clicked_row, clicked_col) in valid_moves:
+                if ROBOT: chessRobotCom.Move(BoardState,start_square,(clicked_row, clicked_col))
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, (clicked_row, clicked_col), ToMove)
                 last_move_time = pygame.time.get_ticks()  # record when the move happened
                 move_in_progress = True
@@ -158,27 +195,37 @@ while chess_active:
                 valid_moves = []
             piecepickedup = -1
             start_square = (-1, -1)
+        
+    if ROBOT_AGAINST_AI or ROBOT_AGAINST_PLAYER:
+        if ToMove != FirstMove:
+            start_square,end_square = chessRobotCom.GetMove()
+            valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
+            last_move_time = pygame.time.get_ticks()
+                
 
     # AI moves — only if enough time has passed
-    if move_in_progress and pygame.time.get_ticks() - last_move_time < WAIT_TIME or NOAI:
+    if move_in_progress and (pygame.time.get_ticks() - last_move_time < WAIT_TIME ) or NOAI or ROBOT_AGAINST_PLAYER:
         # waiting — skip move
         pass
     else:
         if ToMove == FirstMove:
             valid_moves = chessCore.ValidMoves(BoardState, ToMove)
-            if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)
-            else:
+            print(chessCore.InCheck(BoardState,"w"))
+            if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)                                 
+            else:                                                                                           
                 start_square, end_square = chessAI.Simple_AI.Move(BoardState, ToMove, valid_moves)
+                if ROBOT: chessRobotCom.Move(BoardState,start_square,end_square)
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
                 last_move_time = pygame.time.get_ticks()
                 move_in_progress = True
 
-        elif ToMove != FirstMove and not PLAYER_AGAINST_AI:
+        elif ToMove != FirstMove and not PLAYER_AGAINST_AI and not ROBOT_AGAINST_AI:
             valid_moves = chessCore.ValidMoves(BoardState, ToMove)
 
             if len(valid_moves) == 0: BoardState = CheckGameEnd(BoardState)
             else:
                 start_square, end_square = chessAI.Simple_AI.Move(BoardState, ToMove, valid_moves)
+                if ROBOT: chessRobotCom.Move(BoardState,start_square,end_square)
                 valid_moves, DisplayBoardState, ToMove = HandelMove(start_square, end_square, ToMove)
                 last_move_time = pygame.time.get_ticks()
     #             move_in_progress = True

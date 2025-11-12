@@ -1,9 +1,21 @@
 import numpy as np
 import copy
+import subprocess
+
 
 def __init__():
     global pieceChr
     global MaterialValue
+    global kingPos
+
+    result = subprocess.run(
+    ["dotnet", "run", "--project", "ChessCoreFast/ChessCoreFast.csproj", "-c", "Release"],
+    capture_output=True, text=True
+    )
+
+    print(result.stdout)
+
+    kingPos = {"w": (7, 4), "b": (0, 4)}
 
     pieceChr = [
     "K",
@@ -35,10 +47,22 @@ def __init__():
         1,  # 12 - Black Pawn
     ]
 
+import time
+
+class Timer:
+    def __init__(self):
+        self.lasttime = time.time()
+
+    def time_since_last_call(self):
+        now = time.time()
+        elapsed = now - self.lasttime
+        self.lasttime = now
+        return elapsed
 
 
 
 def Readfen(fen):
+    global kingPos
     parts = fen.split()
     board_part = parts[0]
     ToMove =  parts[1]  # 'w' or 'b'
@@ -52,6 +76,8 @@ def Readfen(fen):
             if char.isdigit():
                 col_idx += int(char)
             else:
+                if char == "k": kingPos["b"] = (col_idx,row_idx)
+                if char == "K": kingPos["w"] = (col_idx,row_idx)
                 pieces[col_idx][row_idx] = pieceChr.index(char) + 1
                 col_idx += 1
 
@@ -249,31 +275,18 @@ def ColorCHRtoNUM(COLORchr):
 def ColorNUMtoCHR(COLORnum):
     return "w" if COLORnum == 0 else "b"  
 
-def InCheck(BoardState, Color):
-    # Color: 0=white, 1=black
-    OpponentColor = 1 if Color == 0 else 0
-
-    AttackedSquares = GetAttackedSquares(BoardState, OpponentColor)
-
-    # Find king position of 'Color'
-    for x in range(8):
-        for y in range(8):
-            piece = BoardState[x][y]
-            if GetPieceType(piece) == "K" and GetPieceColor(piece) == ColorNUMtoCHR(Color):
-                KingPos = (x, y)
-                break
-
-    # If king pos is in attacked squares -> check
-    if KingPos in AttackedSquares:
-        return True
-    return False
+def InCheck(Board,color):
+    global kingPos
+    kx,ky=kingPos[color]
+    opp="b" if color=="w" else "w"
+    return (kx,ky) in GetAttackedSquares(Board,opp)
 
 def IsMate(BoardState):
     #returns a color if it is mate or "" if not
 
     for color in ["w","b"]:
         TotalValidMoves = ValidMoves(BoardState,color)
-        if TotalValidMoves == 0 and InCheck(BoardState,ColorCHRtoNUM(color)):
+        if TotalValidMoves == 0 and InCheck(BoardState,color):
             return color
     return ""
 
@@ -286,7 +299,7 @@ def IsStaleMate(BoardState):
             for y,piece in enumerate(row):
                 if GetPieceColor(piece) == color and piece > 0:
                     TotalValidMoves += len(ValidPieceMoves(BoardState,(x,y),piece,color))
-        if TotalValidMoves == 0 and not InCheck(BoardState,ColorCHRtoNUM(color)):
+        if TotalValidMoves == 0 and not InCheck(BoardState,color):
             return color
     return ""
 
@@ -304,28 +317,36 @@ def GetAttackedSquares(BoardState, Color):
 
     for x, row in enumerate(BoardState):
         for y, piece in enumerate(row):
-            if piece != 0 and ColorCHRtoNUM(GetPieceColor(piece)) == Color:
+            if piece != 0 and GetPieceColor(piece) == Color:
                 # Get pseudo-legal moves without checking for king safety
                 AttackedSquares.extend(
-                    move_generators[piece](BoardState, (x,y), Color, piece)
+                    move_generators[piece](BoardState, (x,y), ColorCHRtoNUM(Color), piece)
                 )
 
     return AttackedSquares
 
 def MakeMove(BoardState,StartSquare,EndSquare):
+    global kingPos
     Capture = BoardState[EndSquare[0]][EndSquare[1]]
-    
-    if (EndSquare[1] == 0 or EndSquare[1] == 7 )and GetPieceType(BoardState[StartSquare[0]][StartSquare[1]]) == "P":
-        if GetPieceColor(BoardState[StartSquare[0]][StartSquare[1]]) == "w":
-            BoardState[EndSquare[0]][EndSquare[1]] = 2
+
+    # Handle pawn promotion
+    piece = BoardState[StartSquare[0]][StartSquare[1]]
+    if (EndSquare[1] == 0 or EndSquare[1] == 7) and GetPieceType(piece) == "P":
+        if GetPieceColor(piece) == "w":
+            BoardState[EndSquare[0]][EndSquare[1]] = 2  # promote to Queen
         else:
-            BoardState[EndSquare[0]][EndSquare[1]] = 8
+            BoardState[EndSquare[0]][EndSquare[1]] = 8  # promote to Queen
     else:
-        BoardState[EndSquare[0]][EndSquare[1]] = BoardState[StartSquare[0]][StartSquare[1]]
+        BoardState[EndSquare[0]][EndSquare[1]] = piece
 
     BoardState[StartSquare[0]][StartSquare[1]] = 0
-    
-    
+
+    # Update king position if moved
+    moved_piece = BoardState[EndSquare[0]][EndSquare[1]]
+    if GetPieceType(moved_piece) == "K":
+        color = GetPieceColor(moved_piece)  # "w" or "b"
+        kingPos[color] = EndSquare
+
     return BoardState, Capture
 
 def ValidMoves(BoardState,ToMove):
@@ -342,6 +363,7 @@ def ValidMoves(BoardState,ToMove):
 
 
 def ValidPieceMoves(BoardState, StartSquare, piece_type, ToMove):
+    global kingPos
     pieceColor = ColorCHRtoNUM(GetPieceColor(piece_type)) # 0 or 1
 
     move_generators = {
@@ -355,16 +377,34 @@ def ValidPieceMoves(BoardState, StartSquare, piece_type, ToMove):
 
 
     ValidPieceMoves = []
-
+    
     for move in move_generators[piece_type](BoardState, StartSquare, pieceColor, piece_type):
-        DummyBoard = copy.deepcopy(BoardState)
-        DummyBoard[StartSquare[0]][StartSquare[1]] = 0
-        DummyBoard[move[0]][move[1]] = piece_type
-
-        if not InCheck(DummyBoard, pieceColor):
+        tempKingPos = kingPos.copy()
+    
+        # if king moves, update king position
+        if GetPieceType(piece_type) == "K":
+            kingPos[ColorNUMtoCHR(pieceColor)] = move
+    
+        # save old pieces for undo
+        captured_piece = BoardState[move[0]][move[1]]
+        moving_piece = BoardState[StartSquare[0]][StartSquare[1]]
+    
+        # make move in-place
+        BoardState[StartSquare[0]][StartSquare[1]] = 0
+        BoardState[move[0]][move[1]] = moving_piece
+    
+        # check legality
+        if not InCheck(BoardState, ColorNUMtoCHR(pieceColor)):
             ValidPieceMoves.append(move)
+    
+        # undo move
+        BoardState[StartSquare[0]][StartSquare[1]] = moving_piece
+        BoardState[move[0]][move[1]] = captured_piece
+        kingPos = tempKingPos
+
 
     return ValidPieceMoves
+
 
 
 
