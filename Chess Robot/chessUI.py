@@ -140,8 +140,8 @@ start_square = (-1,-1)
 valid_moves = []
 
 #set initial starting postion
-BoardState, ToMove = chessCore.Readfen("rn2k1nr/p1pb1ppp/1P6/2bp2N1/1q6/1K1P4/RPP1P1PP/2BQ1BNR w - - 1 12")
-BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pp3ppp/2p5/1B1pp3/3PP3/5N2/PPP2PPP/RNBQK2R b KQkq - 0 1")
+#BoardState, ToMove = chessCore.Readfen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 FirstMove = ToMove
 DisplayBoardState = copy.deepcopy(BoardState)
 
@@ -164,11 +164,18 @@ ROBOT_AGAINST_AI = False
 ROBOT_AGAINST_PLAYER = False
 
 if ROBOT:
+   pass
    chessRobotCom.__init__()
 
+lastResponseCheck = 0
 
 while chess_active:
     mouse_pos = pygame.mouse.get_pos()
+
+    if ROBOT and pygame.time.get_ticks() - lastResponseCheck > 10000:
+        chessRobotCom.CheckResponse()
+        print("check")
+        lastResponseCheck = pygame.time.get_ticks()
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:

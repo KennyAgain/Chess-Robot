@@ -5,6 +5,7 @@ import serial
 import serial.tools.list_ports
 import json
 import time
+import heapq
 
 def __init__():
     global ser
@@ -22,48 +23,40 @@ def find_esp32(baudrate=115200):
     raise Exception("ESP32 not found")
 
 def Neighbors(board, pos):
-    """8-way neighbors inside bounds. Does NOT filter by value."""
+    """4-way neighbors inside bounds. Does NOT filter by value."""
     rows, cols = len(board), len(board[0])
     x, y = pos
-    for dx in [-1, 0, 1]:
-        for dy in [-1, 0, 1]:
-            if dx == 0 and dy == 0:
-                continue  # skip the current cell
+    for dx,dy in [(1,0),(0,1),(-1,0),(0,-1)]:
             nx, ny = x + dx, y + dy
             if 0 <= nx < rows and 0 <= ny < cols:
                 yield nx, ny
 
-def NearestFreeSquare(board, start,path):
-    """
-    Returns the nearest free square to `start`.
-    If unavoidable, allows crossing non-zero cells.
-    Returns (position, cost), where cost = # of crossed non-zero cells.
-    """
-    queue = deque([(start, 0)])  # (position, cost)
-    visited = {start: 0}  # position -> minimal cost seen
 
-    best = None
-    best_cost = float('inf')
+
+
+def FindNearestFreeSquare(board, start,path):
+    board_size = len(board)
+    queue = deque([start])
+    visited = {start}
 
     while queue:
-        (x, y), cost = queue.popleft()
+        x, y = queue.popleft()
 
-        if board[x][y] == 0 and cost <= best_cost:
-            best = (x, y)
-            best_cost = cost
+        for dx, dy in [(0,-1),(0,1),(-1,0),(1,0)]:
+            nx, ny = x + dx, y + dy
 
-        for nx, ny in Neighbors(board, (x, y)):
-            new_cost = cost + (1 if board[nx][ny] != 0 else 0)
-            if ((nx, ny) not in visited or new_cost < visited[(nx, ny)] ) and not (nx,ny) in path:
-                visited[(nx, ny)] = new_cost
+            if 0 <= nx < board_size and 0 <= ny < board_size:
+                if (nx, ny) in visited:
+                    continue
+
+                visited.add((nx, ny))
+
                 if board[nx][ny] == 0:
-                    queue.appendleft(((nx, ny), new_cost))
-                else:
-                    queue.append(((nx, ny), new_cost))
+                    queue.append((nx, ny))
+                    if not (nx,ny) in path:
+                        return (nx, ny)
 
-    if best is None:
-        return None, float('inf')
-    return best, best_cost
+    return None
 
 
 def SearchShortestPath(board, start, target):
@@ -111,29 +104,33 @@ def SearchShortestPath(board, start, target):
 def GenerateMovementPath(board,start,end):
     FinalPath = []
 
-    Secondary_path = []
+    Secondary_paths = []
 
     #Checks if there is a direct path and returns it
-    Primary_path, Primary_cost = SearchShortestPath(board,start,end) 
+    Primary_path, _ = SearchShortestPath(board,start,end) 
     print(f"path found: {Primary_path}")
     if Primary_path == 0: return Primary_path
 
     for (x,y) in Primary_path:
         if board[x][y] > 0 and (x,y) != start:
-            best, best_cost = NearestFreeSquare(board,(x,y),Primary_path)
+            best = FindNearestFreeSquare(board,(x,y),Primary_path + Secondary_paths)
             print(best)
-            print(f"Piece in the way at x: {x} and y: {y}")
+            print(f"Piece in the way at x: {x} and y: {y} for Secondary_path")
 
-            Secondary_path, Secondary_cost = SearchShortestPath(board,(x,y),best) #generate path for piece in the way
+            path, _ = SearchShortestPath(board,(x,y),best) #generate path for piece in the way
+            Secondary_paths.append(path)
 
-            print(f"Secondary Path found: {Secondary_path}")
-    
+            print(f"Avodiance Path found: {path}")
+
 
     # If there is a secondary path, execute it first
-    if Secondary_path:
-        FinalPath = Secondary_path.copy()
-        FinalPath.insert(1, (-2,-2))  # marker after first move
-        FinalPath.append((-1,-1))  # end marker
+    for sec_path in Secondary_paths:
+
+        markerd_sec_path = sec_path.copy() #copy the path array
+        markerd_sec_path.insert(1, (-2,-2))# marker after first move
+        markerd_sec_path.append((-1,-1))  # end marker
+
+        FinalPath += markerd_sec_path
 
     # Append primary path
     primary_start_index = len(FinalPath)
@@ -142,19 +139,26 @@ def GenerateMovementPath(board,start,end):
     FinalPath.append((-1,-1))  # end marker
 
     # If secondary path was executed, undo it
-    if Secondary_path:
-        rev_start_index = len(FinalPath)
-        FinalPath += list(reversed(Secondary_path))
-        FinalPath.insert(rev_start_index + 1, (-2,-2))  # marker after first move of reversed path
-        FinalPath.append((-1,-1))
+    for sec_path in Secondary_paths:
 
+        markerd_sec_path = sec_path.copy() #copy the path array
+        markerd_sec_path = list(reversed(markerd_sec_path)) #reverse the moves
+        markerd_sec_path.insert(1, (-2,-2))# marker at the start of the array
+        markerd_sec_path.append((-1,-1)) #pickup marker at the end of the array
+    
+        FinalPath += markerd_sec_path
+        
     return FinalPath
 
 def GetMove():
     pass
 
+#TODO 
+#Also give the robot the info if the move is a travel or not
+#
+
 def Move(board,start,target):
-    global ser
+    #global ser
     FinalPath = str(GenerateMovementPath(board, start, target)) + '\n'
 
     FinalPath = FinalPath.replace("(","[")
@@ -164,11 +168,23 @@ def Move(board,start,target):
     ser.write(FinalPath.encode('utf-8'))
 
     time.sleep(0.1)
-    if ser.in_waiting > 0:
-        response = ser.read(ser.in_waiting).decode('utf-8')  # read all available bytes
-        print(f"ESP Feedback: {response}")
-    else:
-        print("No response from ESP")
+
+    ser.write("Parsed\n".encode('utf-8'))
+
+    time.sleep(0.1)
+
+    ser.write("KeepAlive\n".encode('utf-8'))
+
+
+
+
+def CheckResponse():
+    while ser.in_waiting > 0:
+        try:
+            response = ser.read(ser.in_waiting).decode('utf-8')  # read all available bytes
+            print(f"ESP Feedback: {response}")
+        except:
+            print("An error occured while reading the esps response")
     
 
 
