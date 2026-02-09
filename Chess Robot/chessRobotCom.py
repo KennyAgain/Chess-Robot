@@ -181,7 +181,7 @@ def Move(board,start,target):
 def CheckResponse():
     while ser.in_waiting > 0:
         try:
-            response = ser.read(ser.in_waiting).decode('utf-8')  # read all available bytes
+            response = ser.readline().decode('utf-8')  # read all available bytes
             print(f"ESP Feedback: {response}")
         except:
             print("An error occured while reading the esps response")
